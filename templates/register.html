@@ -1,0 +1,43 @@
+{% extends "index.html" %}
+
+{% block head %}
+  {{super()}}
+{% endblock %}
+
+{% block header %}
+  <br> 
+  <h1>Register</h1><br>
+
+  {% if error_msg %}
+    <div class="alert alert-danger" role="alert">
+        Error: {{ error_msg }}
+    </div>
+  {% endif %}
+
+  <form action="{{ url_for('register') }}" method="POST" enctype="multipart/form-data">
+    <div class="form-group">
+      <label for="user_id">ID:</label>
+      <input type="text"
+             id="user_id"
+             name="user_id" />
+    </div>
+    <div class="form-group">
+      <label for="user_name">Username:</label>
+      <input type="text"
+             id="user_name"
+             name="user_name" />
+    </div>
+    <div class="form-group">
+      <label for="password">Password:</label>
+      <input type="password"
+             id="password"
+             name="password" />
+    </div>
+    <input type="file" name="file"/>
+    </div>
+    <br/>
+    <br>
+    <button type="submit" class="btn btn-primary">Register</button>
+  </form>
+
+{% endblock %}
