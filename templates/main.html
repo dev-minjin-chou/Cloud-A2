@@ -1,0 +1,74 @@
+{% extends "index.html" %}
+
+{% block head %}
+  {{super()}}
+{% endblock %}
+
+{% block header %} 
+<br>
+  <h1>Forum Page</h1>
+  <br>
+
+  {% if error_msg %}
+    <div class="alert alert-danger" role="alert">
+      Error: {{ error_msg }}
+    </div>
+  {% endif %}
+
+  <div class="top-bar">
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-md-4">
+              <div class="row-md-3">
+                <h5>User area</h5><br>
+                  <label for="username">Username:</label>
+                  {% if username_login %}
+                    <a href='/user'><var>{{ username_login }}</var></a><br><br>
+                  {% else %}
+                    <a href='/user'><var>{{ newUsername }}</var></a><br><br>
+                  {% endif %}
+                  <img src="{{test}}" width="120" height="120" /><br><br>
+                  <a href='/login'>Log out</a>
+            </div>
+          </div>
+            <div class="col-md-4">
+              <h5>Message Posting</h5><br>
+              <form action="{{ url_for('main') }}" id="postform" method="POST" enctype="multipart/form-data">
+                <div class="form-group">
+                  <label for="subject">Subject:</label>
+                  <input type="text"
+                         id="subject"
+                         name="subject" />
+                </div>
+                <button type="submit" class="btn btn-primary">Post</button><br>
+                <br>
+                <input type="file" name="file"/>
+                <br><br>
+              </form>
+              <br>
+              <p>Enter messages below:</p>
+              <textarea rows="4" cols="40" name="comment" form="postform"></textarea>
+          </div>
+            <div class="col-md-4">
+              <h5>Message Display</h5><br>
+              {% for subject in subjects %} 
+                <div class="container-fluid">
+                  <div class="col-md-12 text-left">
+                    <img src="https://storage.cloud.google.com/cloud-computinga-01.appspot.com/{{subject['user_id']}}" width="40" height="40" /><br><br>
+                    <P><b>{{ subject['user_name'] }}</b> posted: </p>  
+                  </div>
+                  <div class="col-md-12">
+                    <img src="https://storage.cloud.google.com/cloud-computinga-01.appspot.com/{{subject['subject']}}" width="80" height="80" /><br><br>
+                    <p style="font-size:18px">Subject: <b>{{ subject['subject'] }}</b> </p> 
+                    <P ALIGN=LEFT>{{ subject['messages'] }}</P>  
+                    <P ALIGN=RIGHT>{{subject['timestamp']}}</P>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+

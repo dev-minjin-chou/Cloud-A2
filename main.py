@@ -1,30 +1,16 @@
 from flask import Flask, render_template, request, url_for, redirect, send_file
+from decimal import Decimal
 import logging
 import json
 import boto3
 from botocore.exceptions import ClientError
+from boto3.dynamodb.conditions import Key, Attr
+
 
 app = Flask(__name__)
 
 username_login = ''
-userid_login = ''
-
-def create_bucket(bucket_name, region=None):
-
-    # Create bucket
-    try:
-        if region is None:
-            s3_client = boto3.client('s3')
-            s3_client.create_bucket(Bucket=bucket_name)
-        else:
-            s3_client = boto3.client('s3', region_name=region)
-            location = {'LocationConstraint': region}
-            s3_client.create_bucket(Bucket=bucket_name,
-                                    CreateBucketConfiguration=location)
-    except ClientError as e:
-        logging.error(e)
-        return False
-    return True
+email_login = ''
 
 
 def upload_file(file_name, bucket, object_name=None):
@@ -78,32 +64,92 @@ def create_music_table(dynamodb=None):
     return table
 
 
+def load_data(musics, dynamodb=None):
+    dynamodb = boto3.resource('dynamodb')
+
+    table = dynamodb.Table('music')
+    
+
+    for music in musics['songs']:
+        artist = music['artist']
+        title = music['title']
+        year = music['year']
+        web_url = music['web_url']
+        img_url = music['img_url']
+        table.put_item(Item=music)
+    
+    return True
+   
 @app.route("/create")
 def creation():
     error_msg = None
     try:
         dynamotable = create_music_table()
-        print("Table status:", dynamotable.table_status)
+        if dynamotable is None:
+            return render_template('create.html')
+        else: 
+            error_msg = 'Table has already been created..'
+            return render_template('login.html', error_msg=error_msg)
     except Exception as e:
         error_msg = e
         return render_template('login.html', error_msg=error_msg)
+
+# Loading data from a2.json to dynamo
+@app.route("/load")
+def load():
+    error_msg = None
+    try:
+        with open('a2.json') as json_file:
+            music_list = json.load(json_file, parse_float=Decimal)
+        test = load_data(music_list)
+
+        if test:
+            return render_template('load.html')
+        else:
+            error_msg = 'Unable to add data'
+            return render_template('login.html', error_msg=error_msg)
+    except Exception as e:
+        error_msg = e
+        logging.error(e)
+        return render_template('login.html', error_msg=error_msg)
+
 
 @app.route("/")
 def root():
     return render_template("login.html")
 
+# Querying dynamo by email.
+def query(email, dynamodb=None):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('login')
+
+    response = table.query(
+        KeyConditionExpression=Key('email').eq(email),
+    )
+    return response['Items']
 
 @app.route('/login', methods=["POST", "GET"])
 def login():
 
     if request.method == "POST":
-        user_id = request.form.get("user_id")
+        email = request.form.get("email")
         password = request.form.get("password")
         error_msg = None
 
         try: 
-                
-            return render_template('login.html', error_msg=error_msg)
+            query_result = query(email)
+            if len(query_result) > 0:
+                if email != query_result[0]['email']:
+                    error_msg = 'Email or password is invalid'
+                    return render_template('login.html', error_msg=error_msg)
+                elif password != query_result[0]['password']:
+                    error_msg = 'Email or password is invalid'
+                    return render_template('login.html', error_msg=error_msg)
+                else:
+                    return render_template('main.html', error_msg=error_msg)
+            else:
+                error_msg = 'Email or password is invalid'
+                return render_template('login.html', error_msg=error_msg)
 
         except Exception as e:
             error_msg = e
@@ -115,7 +161,7 @@ def login():
 def register():
 
     if request.method == "POST":
-        user_id = request.form.get("user_id")
+        email = request.form.get("email")
         user_name = request.form.get("user_name")
         password = request.form.get("password")
         error_msg = None
@@ -142,6 +188,13 @@ def register():
 
     else:
         return render_template('register.html')
+
+
+@app.route('/main', methods=["POST", "GET"])
+def main():
+     
+    return render_template('main.html')
+
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=8080, debug=True)
