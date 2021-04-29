@@ -157,6 +157,20 @@ def login():
     else:
         return render_template('login.html')
         
+
+# For creating new user
+def put_user(email, username, password, dynamodb=None):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('login')
+    response = table.put_item(
+        Item={
+            'email': email,
+            'user_name': username,
+            'password': password
+        }
+    )
+    return True
+
 @app.route('/register', methods=["POST", "GET"])
 def register():
 
@@ -165,22 +179,22 @@ def register():
         user_name = request.form.get("user_name")
         password = request.form.get("password")
         error_msg = None
-        file_img = request.files['file']
 
         try:
-            
-            if 'file' not in request.files:
-                error_msg = 'No file error'
-                return render_template('register.html', error_msg=error_msg)
-
-            if file_img.filename == '':
-                error_msg = 'Please choose a file to upload as user avatar.'
-                return render_template('register.html', error_msg=error_msg)
-
+            query_result = query(email)
+            if len(query_result) > 0:
+                if email == query_result[0]['email']:
+                    error_msg = 'The email already exists.'
+                    return render_template('register.html', error_msg=error_msg)
 
             else:
-                
-                return redirect(url_for("login"))
+                addUser = put_user(email, user_name, password)
+
+                if addUser:
+                    return redirect(url_for("login"))
+                else:
+                    error_msg = 'Failed to create an account..'
+                    return render_template('register.html', error_msg=error_msg)
 
         except Exception as e:
             error_msg = e
