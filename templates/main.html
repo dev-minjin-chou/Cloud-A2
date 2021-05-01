@@ -6,7 +6,7 @@
 
 {% block header %} 
 <br>
-  <h1>Forum Page</h1>
+  <h1>Main Page</h1>
   <br>
 
   {% if error_msg %}
@@ -18,51 +18,86 @@
   <div class="top-bar">
     <div class="container-fluid">
         <div class="row">
-            <div class="col-md-4">
+            <div class="col-md-2">
               <div class="row-md-3">
                 <h5>User area</h5><br>
                   <label for="username">Username:</label>
                   {% if username_login %}
-                    <a href='/user'><var>{{ username_login }}</var></a><br><br>
+                    <p>{{ username_login }}</p><br><br>
                   {% else %}
-                    <a href='/user'><var>{{ newUsername }}</var></a><br><br>
+                    <p>{{ newUsername }}</p></a><br><br>
                   {% endif %}
-                  <img src="{{test}}" width="120" height="120" /><br><br>
                   <a href='/login'>Log out</a>
             </div>
           </div>
-            <div class="col-md-4">
-              <h5>Message Posting</h5><br>
-              <form action="{{ url_for('main') }}" id="postform" method="POST" enctype="multipart/form-data">
-                <div class="form-group">
-                  <label for="subject">Subject:</label>
-                  <input type="text"
-                         id="subject"
-                         name="subject" />
+            <div class="col-md-6">
+              <h5>Query Area</h5><br>
+              <div class="row">
+                <form action="{{ url_for('main') }}" id="postform" method="POST" enctype="multipart/form-data">
+                    <div class="form-group">
+                        <label for="title">Title:</label>
+                        <input type="text"
+                            id="title"
+                            name="title" />
+                    </div>
+                    <div class="form-group">
+                        <label for="year">Year:</label>
+                        <input type="text"
+                            id="year"
+                            name="year" />
+                    </div>
+                    <div class="form-group">
+                        <label for="artist">Artist:</label>
+                        <input type="text"
+                            id="artist"
+                            name="artist" />
+                    </div>
+                    <br>
+                    <button type="submit" class="btn btn-primary">Query</button>
+                </form>
+              </div>
+              <br><br>
+              <div class="row">
+                <div class="col-md-12">
+                {% for queries in query_result  %} 
+                    <div class="col-md-4 text-left">
+                        <p style="font-size:13px">Title: <b>{{ queries['title'] }}</b> </p>  
+                    </div>
+                    <div class="col-md-4">
+                        <p style="font-size:13px">Artist: <b>{{ queries['artist'] }}</b> </p> 
+                        <image src="{{queries['img_url']}}" width="40" height="40" /><br><br>
+                    </div>
+                    <div class="col-md-4">
+                        <p style="font-size:13px">Year: <b>{{ queries['year'] }}</b> </p> 
+                    </div>
+                    {% if newUsername %}
+                        <a href="{{ url_for('subscribe', artist=queries['artist'], title=queries['title'],
+                                img_url=queries['img_url'], web_url=queries['web_url'], year=queries['year'],
+                                user_name=newUsername) }}"
+                        class="btn btn-primary">Subscribe</a>
+                    {% endif %}
+                {% endfor %} 
                 </div>
-                <button type="submit" class="btn btn-primary">Post</button><br>
-                <br>
-                <input type="file" name="file"/>
-                <br><br>
-              </form>
-              <br>
-              <p>Enter messages below:</p>
-              <textarea rows="4" cols="40" name="comment" form="postform"></textarea>
-          </div>
+              </div>
+            </div>
             <div class="col-md-4">
-              <h5>Message Display</h5><br>
-              {% for subject in subjects %} 
+              <h5>Subscription Area</h5><br>
+              {% for subject in subscriptions  %} 
                 <div class="container-fluid">
-                  <div class="col-md-12 text-left">
-                    <img src="https://storage.cloud.google.com/cloud-computinga-01.appspot.com/{{subject['user_id']}}" width="40" height="40" /><br><br>
-                    <P><b>{{ subject['user_name'] }}</b> posted: </p>  
-                  </div>
-                  <div class="col-md-12">
-                    <img src="https://storage.cloud.google.com/cloud-computinga-01.appspot.com/{{subject['subject']}}" width="80" height="80" /><br><br>
-                    <p style="font-size:18px">Subject: <b>{{ subject['subject'] }}</b> </p> 
-                    <P ALIGN=LEFT>{{ subject['messages'] }}</P>  
-                    <P ALIGN=RIGHT>{{subject['timestamp']}}</P>
-                  </div>
+                    <div class="row">
+                        <div class="col-md-4 text-left">
+                            <p style="font-size:13px">Title: <b>{{ subject['title'] }}</b> </p>  
+                        </div>
+                        <div class="col-md-4">
+                            <p style="font-size:13px">Artist: <b>{{ subject['artist'] }}</b> </p> 
+                            <image src="{{subject['img_url']}}" width="40" height="40" /><br><br>
+                        </div>
+                        <div class="col-md-4">
+                            <p style="font-size:13px">Year: <b>{{ subject['year'] }}</b> </p> 
+                        </div>
+                        <a href="{{url_for('remove', user_name=subject['user_name'], artist=subject['artist'])}}"
+                        class="btn btn-danger">Remove</a>
+                    </div>
                 </div>
               {% endfor %}
             </div>

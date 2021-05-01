@@ -3,6 +3,9 @@ from decimal import Decimal
 import logging
 import json
 import boto3
+import requests
+import os
+import tempfile
 from botocore.exceptions import ClientError
 from boto3.dynamodb.conditions import Key, Attr
 
@@ -13,13 +16,14 @@ username_login = ''
 email_login = ''
 
 
+# Uploading img to s3
 def upload_file(file_name, bucket, object_name=None):
 
     # If S3 object_name was not specified, use file_name
     if object_name is None:
         object_name = file_name
-        # Upload the file
-        s3_client = boto3.client('s3')
+
+    s3_client = boto3.client('s3')
     try:
         response = s3_client.upload_file(file_name, bucket, object_name)
     except ClientError as e:
@@ -66,9 +70,7 @@ def create_music_table(dynamodb=None):
 
 def load_data(musics, dynamodb=None):
     dynamodb = boto3.resource('dynamodb')
-
     table = dynamodb.Table('music')
-    
 
     for music in musics['songs']:
         artist = music['artist']
@@ -79,7 +81,15 @@ def load_data(musics, dynamodb=None):
         table.put_item(Item=music)
     
     return True
-   
+
+# Download images based on url.
+def download_img(img_url, filename):
+    resource = requests.get(img_url)
+    file = open(filename, "wb")
+    file.write(resource.content)
+    file.close()
+
+# Auto creates table
 @app.route("/create")
 def creation():
     error_msg = None
@@ -113,6 +123,26 @@ def load():
         logging.error(e)
         return render_template('login.html', error_msg=error_msg)
 
+# Uploading image to bucket
+@app.route("/bucket")
+def upload_s3():
+    error_msg = None
+    try:
+        with open('a2.json') as json_file:
+            music_list = json.load(json_file, parse_float=Decimal)
+            for music in music_list['songs']:
+                img_url = music['img_url']
+                file_path = '/tmp/' + img_url.split("/")[-1]
+                test = download_img(img_url, file_path)
+                object_name = img_url.split("/")[-1]
+                upload_file(file_path, 'cloudcomputingaassignment2', object_name)
+
+            return render_template('bucket.html')    
+
+    except Exception as e:
+        error_msg = e
+        logging.error(e)
+        return render_template('login.html', error_msg=error_msg)
 
 @app.route("/")
 def root():
@@ -137,16 +167,20 @@ def login():
         error_msg = None
 
         try: 
-            query_result = query(email)
-            if len(query_result) > 0:
-                if email != query_result[0]['email']:
+            query_result1 = query(email)
+            if len(query_result1) > 0:
+                if email != query_result1[0]['email']:
                     error_msg = 'Email or password is invalid'
                     return render_template('login.html', error_msg=error_msg)
-                elif password != query_result[0]['password']:
+                elif password != query_result1[0]['password']:
                     error_msg = 'Email or password is invalid'
                     return render_template('login.html', error_msg=error_msg)
                 else:
-                    return render_template('main.html', error_msg=error_msg)
+                    global username_login, email_login
+                    email_login = query_result1[0]['email']
+                    username_login = query_result1[0]['user_name']
+                    subscriptions = get_musics(username_login)
+                    return render_template('main.html', error_msg=error_msg, username_login=username_login, subscriptions=subscriptions)
             else:
                 error_msg = 'Email or password is invalid'
                 return render_template('login.html', error_msg=error_msg)
@@ -203,11 +237,147 @@ def register():
     else:
         return render_template('register.html')
 
+# For user to subscribe a music
+@app.route('/subscribe')
+def subscribe(dynamodb=None):
+    dynamodb = boto3.resource('dynamodb')
+    table = dynamodb.Table('subscription')
+
+    artist = request.args.get('artist')
+    title = request.args.get('title')
+    img_url = request.args.get('img_url')
+    web_url = request.args.get('web_url')
+    year = request.args.get('year')
+    user_name = request.args.get('user_name')
+
+
+    response = table.put_item(Item={
+        'user_name': user_name,
+        'artist': artist,
+        'title': title,
+        'img_url': img_url,
+        'web_url': web_url,
+        'year': year
+    })
+    return render_template('subscribe.html')
+
+
+# Display user subscribed musics
+def get_musics(user_name, dynamodb=None):
+    dynamodb =  boto3.resource('dynamodb')
+    table = dynamodb.Table('subscription')
+
+    response = table.query(
+        KeyConditionExpression=Key('user_name').eq(user_name)
+    )
+    return response['Items']
+
+
+# Delete music from dynamo when user click remove.
+@app.route('/remove')
+def remove(dynamodb=None):
+    dynamodb =  boto3.resource('dynamodb')
+    table = dynamodb.Table('subscription')
+    user_name = request.args.get('user_name')
+    artist = request.args.get('artist')
+
+    response = table.delete_item(
+        Key={
+            'user_name': user_name,
+            'artist': artist
+        }
+    )   
+    return render_template('remove.html')
+
+
+def query_table(artist, title, year, dynamodb=None):
+    dynamodb =  boto3.resource('dynamodb')
+    table = dynamodb.Table('music')
+
+    if artist == '':
+        if title == '':
+            if year != '':
+                response = table.scan(
+                    FilterExpression=Attr('year').eq(year)
+                )
+                return response['Items']
+    elif artist != '':
+        if title == '':
+            if year == '':
+                response = table.query(
+                    KeyConditionExpression=Key('artist').eq(artist)
+                )
+                return response['Items']
+    elif artist == '':
+        if year == '':
+            if title != '':
+                response = table.scan(
+                    FilterExpression=Attr('title').eq(title)
+                )
+                return response['Items']
+    elif artist != '':
+        if title != '':
+            if year == '':
+                response = table.query(
+                    KeyConditionExpression=Key('artist').eq(artist) & Key('title').eq(title)
+                )
+                return response['Items']
+    elif artist != '':
+        if title == '':
+            if year != '':
+                response = table.query(
+                    KeyConditionExpression=Key('artist').eq(artist),
+                    FilterExpression=Attr('year').eq(year)
+                )
+                return response['Items']
+    elif artist == '':
+        if title != '':
+            if year != '':
+                response = table.query(
+                    KeyConditionExpression=Key('title').eq(title),
+                    FilterExpression=Attr('year').eq(year)
+                )
+                return response['Items']
+    else:
+        response = table.query(
+            KeyConditionExpression=Key('artist').eq(artist) & Key('title').eq(title),
+            FilterExpression=Attr('year').eq(year)
+        )
+        return response['Items']
 
 @app.route('/main', methods=["POST", "GET"])
 def main():
-     
-    return render_template('main.html')
+    userName = username_login
+    query_username = query(email_login)
+
+    if userName == query_username[0]['user_name']:
+        newUsername = userName
+    subscriptions = get_musics(newUsername)
+
+    if request.method == "POST":
+        try:
+            title = request.form.get("title")
+            year = request.form.get("year")
+            artist = request.form.get("artist")
+            error_msg = None
+            query_result = query_table(artist, title, year)
+
+            if query_result is not None:
+                if len(query_result) > 0:
+                    return render_template('main.html', newUsername=username_login, query_result=query_result,subscriptions=subscriptions, error_msg=error_msg)
+                else:
+                    error_msg = 'No result is  retrieved. Please query again.'
+                    return render_template('main.html', newUsername=username_login, subscriptions=subscriptions, error_msg=error_msg)
+            else:
+                error_msg = 'No result is  retrieved. Please query again.'
+                return render_template('main.html', newUsername=username_login, subscriptions=subscriptions, error_msg=error_msg)
+           
+        except Exception as e:
+            error_msg = e
+            return render_template('main.html', newUsername=username_login, subscriptions=subscriptions, error_msg=error_msg)
+    else:
+        return render_template('main.html', newUsername=username_login, subscriptions=subscriptions)
+
 
 
 if __name__ == '__main__':
