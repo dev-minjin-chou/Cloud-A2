@@ -301,54 +301,53 @@ def query_table(artist, title, year, dynamodb=None):
                     FilterExpression=Attr('year').eq(year)
                 )
                 return response['Items']
-    elif artist != '':
-        if title == '':
-            if year == '':
-                response = table.query(
-                    KeyConditionExpression=Key('artist').eq(artist)
-                )
-                return response['Items']
-    elif artist == '':
-        if year == '':
-            if title != '':
-                response = table.scan(
-                    FilterExpression=Attr('title').eq(title)
-                )
-                return response['Items']
-    elif artist != '':
+    if artist != '':
+        if title == '' and year == '':
+            response = table.query(
+                KeyConditionExpression=Key('artist').eq(artist)
+            )
+            return response['Items']
+    if artist == '' and year == '':
         if title != '':
-            if year == '':
-                response = table.query(
-                    KeyConditionExpression=Key('artist').eq(artist) & Key('title').eq(title)
-                )
-                return response['Items']
-    elif artist != '':
-        if title == '':
-            if year != '':
-                response = table.query(
-                    KeyConditionExpression=Key('artist').eq(artist),
-                    FilterExpression=Attr('year').eq(year)
-                )
-                return response['Items']
-    elif artist == '':
-        if title != '':
-            if year != '':
-                response = table.query(
-                    KeyConditionExpression=Key('title').eq(title),
-                    FilterExpression=Attr('year').eq(year)
-                )
-                return response['Items']
-    else:
-        response = table.query(
-            KeyConditionExpression=Key('artist').eq(artist) & Key('title').eq(title),
-            FilterExpression=Attr('year').eq(year)
-        )
-        return response['Items']
+            response = table.scan(
+                FilterExpression=Attr('title').eq(title)
+            )
+            return response['Items']
+    if artist != '':
+        if title != '' and year == '':
+            response = table.query(
+                KeyConditionExpression=Key('artist').eq(artist) & Key('title').eq(title)
+            )
+            return response['Items']
+    if artist != '':
+        if title == '' and year != '':
+            response = table.query(
+                KeyConditionExpression=Key('artist').eq(artist),
+                FilterExpression=Attr('year').eq(year)
+            )
+            return response['Items']
+    if artist == '':
+        if title != '' and year != '':
+            response = table.scan(
+                FilterExpression=Attr('year').eq(year) & Attr('title').eq(title)
+            )
+            return response['Items']
+    if artist != '':
+        if title != '' and year != '':
+            response = table.query(
+                KeyConditionExpression=Key('artist').eq(artist) & Key('title').eq(title),
+                FilterExpression=Attr('year').eq(year)
+            )
+            return response['Items']
 
 @app.route('/main', methods=["POST", "GET"])
 def main():
     userName = username_login
-    query_username = query(email_login)
+    try:
+        query_username = query(email_login)
+    except Exception as e:
+        error_msg = 'Timed-out. Please re-login to continue session.'
+        return render_template('login.html', error_msg=error_msg)
 
     if userName == query_username[0]['user_name']:
         newUsername = userName
